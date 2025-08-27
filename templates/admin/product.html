@@ -1,0 +1,189 @@
+{% extends "admin/admin_master.html" %}
+{% block admin_content %}
+
+    <div id="app_product" class="d-flex flex-column">
+        <div class="container-fluid">
+            <!-- Page Heading -->
+            <div class="d-sm-flex align-items-center justify-content-between mb-4">
+                <h1 class="h3 mb-0 text-gray-800">Products</h1>
+                <div @click="showAddModal" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm">
+                    <i class="fas fa-plus fa-sm text-white-50"></i> Add Product
+                </div>
+            </div>
+
+            <!-- Products Table -->
+            <table class="table table-bordered table-striped">
+                <thead class="thead-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Image</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr v-for="product in products" :key="product.id">
+                    <td>[[ product.id ]]</td>
+                    <td>[[ product.name ]]</td>
+                    <td>[[ product.category ]]</td>
+                    <td>$[[ product.price ]]</td>
+                    <td>
+                        <img :src="product.image ? '/static/uploads/' + product.image : ''" alt="image" width="80"
+                             height="50">
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-primary mr-1" @click="showEditModal(product)">Edit</button>
+                        <button class="btn btn-sm btn-danger" @click="deleteProduct(product.id)">Delete</button>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+
+            <!-- Add/Edit Modal -->
+            <div class="modal fade" id="productModal" tabindex="-1" role="dialog">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <form @submit.prevent="saveProduct">
+                            <div class="modal-header">
+                                <h5 class="modal-title">[[ modalTitle ]]</h5>
+                                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="form-group">
+                                    <label>Name</label>
+                                    <input type="text" class="form-control" v-model="selectedProduct.name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Category</label>
+                                    <input type="text" class="form-control" v-model="selectedProduct.category" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Price</label>
+                                    <input type="number" class="form-control" v-model="selectedProduct.price" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Image</label>
+                                    <input type="file" class="form-control" @change="onFileChange">
+                                    <div v-if="selectedProduct.image && !file" class="mt-2">
+                                        <img :src="'/static/uploads/' + selectedProduct.image" width="100"
+                                             alt="current">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="submit" class="btn btn-success">Save</button>
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const {createApp, ref} = Vue;
+
+        createApp({
+            delimiters: ['[[', ']]'],
+            setup() {
+                const products = ref({{ products|tojson|safe }});
+                const selectedProduct = ref({});
+                const modalTitle = ref('Add Product');
+                const file = ref(null);
+
+                const showAddModal = () => {
+                    selectedProduct.value = {};
+                    file.value = null;
+                    modalTitle.value = "Add Product";
+                    $('#productModal').modal('show');
+                };
+
+                const showEditModal = (product) => {
+                    selectedProduct.value = {...product};
+                    file.value = null;
+                    modalTitle.value = "Edit Product";
+                    $('#productModal').modal('show');
+                };
+
+                const onFileChange = (event) => {
+                    file.value = event.target.files[0];
+                };
+
+                const saveProduct = () => {
+                    const formData = new FormData();
+                    formData.append('name', selectedProduct.value.name);
+                    formData.append('category', selectedProduct.value.category);
+                    formData.append('price', selectedProduct.value.price);
+
+                    if (file.value) formData.append('image', file.value);
+
+                    if (selectedProduct.value.id) formData.append('current_image', selectedProduct.value.image || '');
+
+                    const url = selectedProduct.value.id ? '/products/edit/' + selectedProduct.value.id : '/products/add';
+
+                    fetch(url, {
+                        method: 'POST',
+                        body: formData
+                    })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                Swal.fire('Success', data.message, 'success');
+
+                                if (!selectedProduct.value.id) {
+                                    // Add new product to table
+                                    products.value.push(data.product);
+                                } else {
+                                    // Update edited product in table
+                                    const index = products.value.findIndex(p => p.id === selectedProduct.value.id);
+                                    if (index !== -1) products.value[index] = {
+                                        ...selectedProduct.value,
+                                        image: data.product.image
+                                    };
+                                }
+
+                                $('#productModal').modal('hide'); // close modal
+                                file.value = null;
+                                selectedProduct.value = {};
+                            }
+                        });
+                };
+
+                const deleteProduct = (id) => {
+                    Swal.fire({
+                        title: 'Are you sure?',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: 'Yes, delete!',
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            fetch('/products/delete/' + id, {method: 'POST'})
+                                .then(res => res.json())
+                                .then(data => {
+                                    if (data.success) {
+                                        Swal.fire('Deleted!', data.message, 'success');
+                                        products.value = products.value.filter(p => p.id !== id);
+                                    }
+                                });
+                        }
+                    });
+                };
+
+                return {
+                    products,
+                    selectedProduct,
+                    modalTitle,
+                    showAddModal,
+                    showEditModal,
+                    saveProduct,
+                    deleteProduct,
+                    file,
+                    onFileChange
+                };
+            }
+        }).mount('#app_product');
+    </script>
+{% endblock %}

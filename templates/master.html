@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>FakeStore</title>
+  {% include "style.html" %}
+  <style>
+    .navbar {
+      background: linear-gradient(90deg, #186e95, #00b894);
+    }
+    .navbar-brand {
+      font-weight: bold;
+      color: white !important;
+      font-size: 1.5rem;
+    }
+    .nav-link {
+      color: white !important;
+      font-weight: 500;
+    }
+    .nav-link:hover {
+      color: #ffeb3b !important;
+    }
+    .search-bar {
+      border-radius: 50px;
+      padding: 0.5rem 1rem;
+      border: none;
+    }
+    .footer {
+      background: #222;
+      color: #ccc;
+      padding: 2rem 0;
+      margin-top: 3rem;
+    }
+    .footer a {
+      color: #00b894;
+      text-decoration: none;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- Navbar -->
+  <div class="container-fluid p-0 m-0">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm sticky-top">
+  <div class="container">
+    <!-- Brand -->
+    <a class="navbar-brand fw-bold" href="/">🛍️ Fake Moto</a>
+
+    <!-- Toggler -->
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+            data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
+            aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <!-- Navbar content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <!-- Left side: Links -->
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <a class="nav-link active" href="/">Catalog</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/support">Support</a>
+        </li>
+      </ul>
+
+      <!-- Right side: Search + Cart -->
+        <input v-model="searchQuery"
+               class="form-control rounded-pill me-2 px-3"
+               type="search"
+               placeholder="Search products..."
+               aria-label="Search" />
+        <a href="/cart" style="float:right;" class="btn btn-warning rounded-pill px-4 fw-semibold">Cart([[ cartCount ]])
+        </a>
+    </div>
+  </div>
+</nav>
+
+  </div>
+
+  <!-- Main Content -->
+  <div class="container mt-4">
+    {% block main_content %}{% endblock %}
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer text-center">
+    <div class="container">
+      <p class="mb-2">© 2025 FakeStore. All Rights Reserved.</p>
+      <div>
+        <a href="/">Home</a> •
+        <a href="/support">Support</a> •
+        <a href="/cart">Cart</a>
+      </div>
+      <div class="mt-2">
+        <a href="#"><i class="bi bi-facebook"></i></a>
+        <a href="#" class="ms-3"><i class="bi bi-twitter"></i></a>
+        <a href="#" class="ms-3"><i class="bi bi-instagram"></i></a>
+      </div>
+    </div>
+  </footer>
+</div>
+
+{% include "script.html" %}
+
+<!-- Vue script unchanged (kept your logic) -->
+<script>
+  const { createApp, ref, computed, onMounted } = Vue;
+
+  createApp({
+    delimiters: ['[[', ']]'],
+    setup() {
+      const cart_list = ref(JSON.parse(localStorage.getItem('cart') ?? '[]'));
+      const cartCount = computed(() =>
+        cart_list.value.reduce((total, item) => total + (item.qty || 1), 0)
+      );
+
+      const searchQuery = ref('');
+      const priceLimit = ref(500);
+      const selected_product = ref({});
+      const quantity = ref(1);
+
+      const products = ref({{ products|default([])|tojson|safe }});
+      const product = ref({{ product|default({})|tojson|safe }});
+
+      const subtotal = computed(() =>
+        cart_list.value.reduce((sum, item) => sum + item.price * item.qty, 0).toFixed(2)
+      );
+      const shipping = computed(() =>
+        cart_list.value.length > 0 ? 5.99 : 0
+      );
+      const tax = computed(() =>
+        (parseFloat(subtotal.value) * 0.1).toFixed(2)
+      );
+      const total = computed(() =>
+        (parseFloat(subtotal.value) + shipping.value + parseFloat(tax.value)).toFixed(2)
+      );
+
+      const filteredProducts = computed(() =>
+        products.value.filter(p =>
+          p.title.toLowerCase().includes(searchQuery.value.toLowerCase()) &&
+          p.price <= priceLimit.value
+        )
+      );
+
+      const addToCart = (item = product.value) => {
+        if (quantity.value < 1) {
+          alert('Quantity must be at least 1');
+          return;
+        }
+
+        const existing = cart_list.value.find(p => p.id === item.id);
+        if (existing) {
+          existing.qty += quantity.value;
+        } else {
+          cart_list.value.push({ ...item, qty: quantity.value });
+        }
+        localStorage.setItem('cart', JSON.stringify(cart_list.value));
+
+        Swal.fire({
+          icon: 'success',
+          title: 'Added to Cart',
+          text: `${item.name} x${quantity.value} added.`,
+          timer: 1200,
+          showConfirmButton: false
+        });
+      };
+
+      const removeCartItem = (index) => {
+        Swal.fire({
+          title: 'Are you sure?',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Yes, remove it!',
+          cancelButtonText: 'Cancel',
+        }).then(result => {
+          if (result.isConfirmed) {
+            cart_list.value.splice(index, 1);
+            localStorage.setItem('cart', JSON.stringify(cart_list.value));
+          }
+        });
+      };
+
+      const increaseQty = (item) => {
+        if (item.qty < 10) {
+          item.qty++;
+          localStorage.setItem('cart', JSON.stringify(cart_list.value));
+        }
+      };
+
+      const decreaseQty = (item, index) => {
+        if (item.qty > 1) {
+          item.qty--;
+          localStorage.setItem('cart', JSON.stringify(cart_list.value));
+        } else {
+          Swal.fire({
+            title: 'Are you sure?',
+            text: 'This will remove the item from your cart.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, remove it!',
+            cancelButtonText: 'Cancel',
+          }).then(result => {
+            if (result.isConfirmed) {
+              cart_list.value.splice(index, 1);
+              localStorage.setItem('cart', JSON.stringify(cart_list.value));
+            }
+          });
+        }
+      };
+
+      const showProductDetail = (p) => {
+        selected_product.value = p;
+        $('#productModal').modal('show');
+      };
+
+      const isCartModalVisible = ref(false);
+      const showCartModal = () => {
+        isCartModalVisible.value = true;
+      };
+      const proceedToPurchase = () => {
+        isCartModalVisible.value = false;
+        window.location.href = "/cart";
+      };
+
+      const checkout = () => {
+        window.location.href = "/checkout";
+      };
+
+      onMounted(() => {
+        console.log("Cart loaded:", cart_list.value);
+        const form = document.getElementById('checkoutForm');
+        if (form) {
+          form.addEventListener('submit', () => {
+            const cartDataInput = document.getElementById('cart_data');
+            if (cartDataInput) {
+              cartDataInput.value = JSON.stringify(cart_list.value);
+            }
+          });
+        } else {
+          console.warn('checkoutForm not found in DOM!');
+        }
+      });
+
+      return {
+        cart_list,
+        cartCount,
+        products,
+        product,
+        selected_product,
+        searchQuery,
+        priceLimit,
+        filteredProducts,
+        quantity,
+        addToCart,
+        removeCartItem,
+        increaseQty,
+        decreaseQty,
+        showProductDetail,
+        subtotal,
+        shipping,
+        tax,
+        total,
+        isCartModalVisible,
+        showCartModal,
+        proceedToPurchase,
+        checkout
+      };
+    }
+  }).mount('#app');
+</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+{% extends "master.html" %}
+{% block main_content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Your Cart</h2>
+
+    <div class="card mb-3" v-for="(item, index) in cart_list" :key="item.id">
+        <div class="row no-gutters align-items-center">
+            <div class="col-md-3 text-center p-2">
+                <img
+                    :src="'/static/uploads/' + item.image"
+                    :alt="item.title"
+                    class="img-fluid"
+                    style="max-height: 150px;"
+                >
+            </div>
+
+            <div class="col-md-6">
+                <div class="card-body">
+                    <h5 class="card-title">[[ item.title ]]</h5>
+                    <p class="card-text mb-1">
+                        <small class="text-muted">Category: [[ item.category ]]</small>
+                    </p>
+                    <p class="card-text mb-1 product-description">
+                        [[ item.description ]]
+                    </p>
+                </div>
+            </div>
+
+            <div class="col-md-3 text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-primary">$[[ (item.price * item.qty).toFixed(2) ]]</h5>
+                    <div class="input-group mb-2" style="max-width:120px; margin:auto;">
+                        <div class="input-group-prepend">
+                            <button class="btn btn-outline-secondary" type="button"
+                                    @click="decreaseQty(item)">-</button>
+                        </div>
+                        <input type="text" class="form-control text-center" v-model="item.qty" readonly>
+                        <div class="input-group-append">
+                            <button class="btn btn-outline-secondary" type="button"
+                                    @click="increaseQty(item)">+</button>
+                        </div>
+                    </div>
+                    <button @click="removeCartItem(index)" class="btn btn-danger btn-sm">Remove</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cart summary -->
+    <div class="row justify-content-end" v-if="cart_list.length > 0">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+
+                    <button @click="checkout" class="btn btn-success btn-block mt-3">
+                        Proceed to Checkout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
